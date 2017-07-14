@@ -50,6 +50,9 @@ int main()
 	cl_uint ret_num_devices;
 	cl_uint ret_num_platforms;
 	cl_int ret;
+	cl_event event;
+	cl_ulong time_start, time_end;
+	double total_time;
 	
 	float *a;
 	float *b, *c;
@@ -86,8 +89,9 @@ int main()
 	ret=clGetPlatformIDs(1, &platform_id, &ret_num_platforms);
 	ret=clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id, &ret_num_devices);
 
+
 	context=clCreateContext(NULL, 1, &device_id, NULL, NULL, &ret);
-	command_queue=clCreateCommandQueue(context, device_id, 0, &ret);
+	command_queue=clCreateCommandQueue(context, device_id, CL_QUEUE_PROFILING_ENABLE, &ret);
 
 	inmat=clCreateBuffer(context, CL_MEM_READ_WRITE, sizeA, NULL, &ret);
 	printcreatebuffererr(ret);
@@ -112,10 +116,10 @@ int main()
 	ret=clSetKernelArg(kernel, 3, sizeof(cl_int), (void*)&h);
 	ret=clSetKernelArg(kernel, 4, sizeof(cl_int), (void*)&w);
 
-	ret=clEnqueueTask(command_queue, kernel, 0, NULL, NULL);
-
-	ret = clEnqueueNDRangeKernel(command_queue, kernel, 1, 0, &work_size, 0, 0, 0, 0);
 	//ret=clEnqueueTask(command_queue, kernel, 0, NULL, NULL);
+
+	ret = clEnqueueNDRangeKernel(command_queue, kernel, 1, 0, &work_size, 0, 0, 0, &event);
+	clWaitForEvents(1, &event);
 
 	ret=clEnqueueReadBuffer(command_queue, outvec, CL_TRUE, 0, sizeC, c, 0, NULL, NULL);
 
@@ -130,6 +134,11 @@ int main()
 	ret=clReleaseMemObject(outvec);
 	ret=clReleaseCommandQueue(command_queue);
 	ret=clReleaseContext(context);
+
+	clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL);
+	clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
+	total_time = time_end-time_start;
+	printf("OpenCl Execution time is: %0.3f ms\n",total_time/1000000.0);
 
 	free(source_str);
 
